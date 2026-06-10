@@ -55,6 +55,7 @@ input_mode = st.sidebar.radio(
 if 'current_roi_dict' not in st.session_state:
     st.session_state['current_roi_dict'] = None
 
+# --- กรณีที่ 1: เลือกกรอกพิกัด ---
 if input_mode == "กรอกพิกัด BBox Array":
     st.sidebar.write("รูปแบบพิกัด: `[Min Lon, Min Lat, Max Lon, Max Lat]`")
     
@@ -74,7 +75,8 @@ if input_mode == "กรอกพิกัด BBox Array":
         else:
             st.sidebar.error("พิกัดไม่ถูกต้อง (ค่า Min ต้องน้อยกว่าค่า Max)")
 
-else:
+# --- กรณีที่ 2: เลือกอัปโหลดไฟล์ (แก้จาก else เป็น elif) ---
+elif input_mode == "อัปโหลดไฟล์ GeoJSON":
     uploaded_file = st.sidebar.file_uploader("เลือกไฟล์คีย์ขอบเขต (.geojson)", type=["geojson", "json"])
     if uploaded_file is not None:
         try:
@@ -94,6 +96,10 @@ else:
             st.sidebar.success("อ่านและบันทึกโครงสร้าง GeoJSON สำเร็จ!")
         except Exception as e:
             st.sidebar.error(f"การอ่านไฟล์ล้มเหลว: {e}")
+
+# --- กรณีที่ 3: เลือกวาดบนแผนที่ ---
+elif input_mode == "วาดขอบเขตบนแผนที่ (Draw)":
+    st.sidebar.info("👉 กรุณาใช้เครื่องมือบนแผนที่ด้านขวา เพื่อวาดกรอบสี่เหลี่ยม (Bounding Box) ที่ต้องการ")
 
 st.sidebar.header("📅 2. ช่วงเวลากรองภาพถ่าย")
 start_date = st.sidebar.date_input("วันที่เริ่มต้น", datetime.date(2023, 1, 1))
