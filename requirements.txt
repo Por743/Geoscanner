@@ -4,3 +4,5 @@ earthengine-api
 geemap
 numpy
 matplotlib
+streamlit-folium
+folium
