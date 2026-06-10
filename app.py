@@ -113,7 +113,7 @@ if st.session_state['current_roi_dict'] is not None:
             style_function=lambda x: {'fillColor': '#00ffeb', 'color': '#00ffeb', 'weight': 2, 'fillOpacity': 0.2}
         ).add_to(preview_map)
         
-        st_folium(preview_map, width=1100, height=400, key="preview_map")
+        st_folium(preview_map, width=1100, height=400, key="preview_map", returned_objects=[])
     except Exception as e:
         st.caption("ระบบกำลังโหลดแผนที่ขอบเขต...")
 else:
