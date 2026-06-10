@@ -3,7 +3,7 @@ import ee
 import geemap.foliumap as geemap
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colors mcolors
+import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import datetime
 import json
