@@ -34,7 +34,7 @@ st.set_page_config(layout="wide")
 st.markdown("""
 <style>
 .big-font {
-    font-size:60px !important;
+    font-size:55px !important;
 }
 </style>
 """, unsafe_allow_html=True)
