@@ -14,23 +14,36 @@ from streamlit_folium import st_folium
 st.set_page_config(page_title="Forest Restoration Map Tool", layout="wide")
 
 # ==========================================
-# GEE INITIALIZATION
+# GEE INITIALIZATION (อัปเดตเวอร์ชันปลอดภัย)
 # ==========================================
 if 'ee_initialized' not in st.session_state:
     try:
-        if "gcp_service_account" in st.secrets:
-            secret_dict = json.loads(st.secrets["gcp_service_account"])
+        # ตรวจสอบความปลอดภัยในการดึงค่าจาก Secrets
+        has_secret = False
+        try:
+            if "gcp_service_account" in st.secrets:
+                has_secret = True
+        except Exception:
+            has_secret = False
+
+        if has_secret:
+            # ดึงข้อความ JSON ออกมา
+            secret_json_str = st.secrets["gcp_service_account"]
+            secret_dict = json.loads(secret_json_str)
+            
+            # ยืนยันสิทธิ์ผ่าน Service Account
             credentials = ee.ServiceAccountCredentials(secret_dict['client_email'], key_data=json.dumps(secret_dict))
             ee.Initialize(credentials, project=secret_dict.get('project_id', "gee1-498904"))
+            st.session_state['ee_initialized'] = True
         else:
+            # สำหรับการรันแบบ Local เครื่องส่วนตัว
             ee.Initialize(project="gee1-498904")
-        st.session_state['ee_initialized'] = True
+            st.session_state['ee_initialized'] = True
+            
     except Exception as e:
         st.error(f"การเชื่อมต่อ GEE ล้มเหลว: {e}")
-
-st.title("🌱 ระบบวิเคราะห์พื้นที่เขาหัวโล้นจากการวาดแผนที่")
-st.write("วิธีใช้งาน: ใช้เครื่องมือวาดรูป (สี่เหลี่ยม หรือ โปลิกอน) บนแผนที่เพื่อเลือกพื้นที่ที่ต้องการวิเคราะห์")
-
+        st.info("คำแนะนำ: ตรวจสอบการตั้งค่ากุญแจลับ gcp_service_account ในหน้า App Secrets ของ Streamlit Cloud")
+        
 # ==========================================
 # INTERACTIVE MAP SELECTION (CROP TOOL)
 # ==========================================
