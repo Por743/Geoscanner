@@ -244,58 +244,75 @@ if run_button and st.session_state['current_roi_dict'] is not None:
                     t1, t2, t3 = st.tabs(["🖼️ NDVI & Terrain", "🎯 ความเหมาะสมในการฟื้นฟู", "📈 คะแนนลำดับความสำคัญ"])
 
                     # ---------------------------------------------------------
-                    # แก้ไข: เพิ่มข้อมูล Elevation เข้ามาแสดงในแท็บที่ 1 (ใช้ระบบ 3 คอลัมน์)
+                    # แท็บที่ 1: ปรับขนาดกราฟให้เท่ากันด้วย figsize และจัดสัดส่วน Colorbar
                     # ---------------------------------------------------------
                     with t1:
-                        col1, col2, col3 = st.columns(3)  # ปรับเพิ่มจาก 2 เป็น 3 คอลัมน์
+                        col1, col2, col3 = st.columns(3)
+                        
+                        # กำหนดขนาดพื้นฐานให้เท่ากัน
+                        t1_figsize = (6, 6)
+
                         with col1:
-                            st.caption("ภาพถ่ายสีจริง True Color (Sentinel-2 Composite)")
-                            fig_rgb, ax_rgb = plt.subplots()
+                            st.caption("ภาพถ่ายสีจริง True Color")
+                            fig_rgb, ax_rgb = plt.subplots(figsize=t1_figsize)
                             ax_rgb.imshow(rgb_data)
                             ax_rgb.axis('off')
+                            # ปรับขอบล่างเผื่อพื้นที่ให้เท่ากับกราฟที่มี Colorbar
+                            fig_rgb.subplots_adjust(bottom=0.18)
                             st.pyplot(fig_rgb)
+                            
                         with col2:
-                            st.caption("ดัชนีความเขียวพืชพรรณ (NDVI Verification)")
-                            fig_ndvi, ax_ndvi = plt.subplots()
+                            st.caption("ดัชนีความเขียวพืชพรรณ (NDVI)")
+                            fig_ndvi, ax_ndvi = plt.subplots(figsize=t1_figsize)
                             im = ax_ndvi.imshow(ndvi_data, cmap='RdYlBu', vmin=0, vmax=0.8)
-                            plt.colorbar(im, ax=ax_ndvi, orientation='horizontal', pad=0.05)
+                            plt.colorbar(im, ax=ax_ndvi, orientation='horizontal', fraction=0.046, pad=0.04)
                             ax_ndvi.axis('off')
                             st.pyplot(fig_ndvi)
-                        with col3:
-                            st.caption("แบบจำลองความสูงเชิงเลข (SRTM DEM Elevation)")
-                            fig_elev, ax_elev = plt.subplots()
-                            # พล็อตแผนที่ระดับความสูง (DEM) ด้วยคัลเลอร์แมปภูมิประเทศ 'terrain'
-                            im_elev = ax_elev.imshow(elev_data, cmap='terrain')
                             
-                            # เสริมเลเยอร์ไฮไลท์สีม่วงโปร่งแสงสำหรับเขตที่ระบบจำแนกเป็น "พื้นที่ภูเขา" (Mountain Area)
+                        with col3:
+                            st.caption("แบบจำลองความสูง (SRTM DEM)")
+                            fig_elev, ax_elev = plt.subplots(figsize=t1_figsize)
+                            im_elev = ax_elev.imshow(elev_data, cmap='terrain')
                             ax_elev.imshow(mountain_mask, cmap='Purples', alpha=0.4, vmin=0, vmax=1.5)
                             
-                            plt.colorbar(im_elev, ax=ax_elev, orientation='horizontal', pad=0.05, label='Meters ASL')
+                            plt.colorbar(im_elev, ax=ax_elev, orientation='horizontal', fraction=0.046, pad=0.04, label='Meters ASL')
                             ax_elev.axis('off')
                             
-                            # เพิ่มสัญลักษณ์อธิบายแผนที่ (Legend) ของพิกัดภูเขา
                             mountain_patch = mpatches.Patch(color='#8c96c6', label='Mountain Mask\n(Elev > 400m & Slope > 5°)')
                             ax_elev.legend(handles=[mountain_patch], loc='lower right', fontsize=8)
                             st.pyplot(fig_elev)
 
+                    # ---------------------------------------------------------
+                    # แท็บที่ 2: ปรับขนาดกราฟให้เล็กลง และวางไว้ตรงกลาง
+                    # ---------------------------------------------------------
                     with t2:
                         st.caption("แผนที่จำแนกความเหมาะสมในการฟื้นฟูสภาพป่าไม้ (Restoration Suitability Map)")
-                        fig_suit, ax_suit = plt.subplots()
-                        ax_suit.imshow(rgb_data)
-                        cmap_s = mcolors.ListedColormap(['#d62728', '#ffea00', '#00ffeb'])
-                        ax_suit.imshow(suit_data, cmap=cmap_s, alpha=0.7)
-                        ax_suit.axis('off')
-                        st.pyplot(fig_suit)
-                        st.info("คำอธิบายกลุ่มพื้นที่ 🔴 สีแดง: พื้นที่วิกฤตสูง | 🟡 สีเหลือง: ความเร่งด่วนปานกลาง | 🔵 สีฟ้า: พื้นที่พร้อมฟื้นฟูสูง")
+                        # ใช้ st.columns เพื่อบีบขนาดภาพให้อยู่ตรงกลาง (อัตราส่วน ซ้าย:กลาง:ขวา = 1:2:1)
+                        t2_col1, t2_col2, t2_col3 = st.columns([1, 2, 1])
+                        
+                        with t2_col2:
+                            fig_suit, ax_suit = plt.subplots(figsize=(4, 4)) # ลดขนาด figsize ลง
+                            ax_suit.imshow(rgb_data)
+                            cmap_s = mcolors.ListedColormap(['#d62728', '#ffea00', '#00ffeb'])
+                            ax_suit.imshow(suit_data, cmap=cmap_s, alpha=0.7)
+                            ax_suit.axis('off')
+                            st.pyplot(fig_suit)
+                            st.info("🔴 สีแดง: วิกฤตสูง | 🟡 สีเหลือง: เร่งด่วนปานกลาง | 🔵 สีฟ้า: พร้อมฟื้นฟูสูง")
 
+                    # ---------------------------------------------------------
+                    # แท็บที่ 3: ปรับขนาดกราฟให้เล็กลง และวางไว้ตรงกลาง
+                    # ---------------------------------------------------------
                     with t3:
                         st.caption("แผนที่ให้คะแนนพื้นที่เป้าหมายระดับย่อย (Restoration Priority Score: 0-100)")
-                        fig_sc, ax_sc = plt.subplots()
-                        ax_sc.imshow(rgb_data)
-                        im_sc = ax_sc.imshow(score_data, cmap='RdYlGn', vmin=0, vmax=100, alpha=0.7)
-                        plt.colorbar(im_sc, ax=ax_sc)
-                        ax_sc.axis('off')
-                        st.pyplot(fig_sc)
+                        t3_col1, t3_col2, t3_col3 = st.columns([1, 2, 1])
+                        
+                        with t3_col2:
+                            fig_sc, ax_sc = plt.subplots(figsize=(4, 4)) # ลดขนาด figsize ลง
+                            ax_sc.imshow(rgb_data)
+                            im_sc = ax_sc.imshow(score_data, cmap='RdYlGn', vmin=0, vmax=100, alpha=0.7)
+                            plt.colorbar(im_sc, ax=ax_sc, shrink=0.8) # หด colorbar เล็กน้อยให้สมดุล
+                            ax_sc.axis('off')
+                            st.pyplot(fig_sc)
 
                     st.success("✅ การประมวลผลและการจัดทำข้อมูลสรุปภาพแผนที่เสร็จสิ้นสมบูรณ์!")
                 else:
