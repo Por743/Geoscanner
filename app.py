@@ -27,8 +27,18 @@ if 'ee_initialized' not in st.session_state:
         st.session_state['ee_initialized'] = True
     except Exception as e:
         st.error(f"การเชื่อมต่อ GEE ล้มเหลว: {e}")
+        
+st.set_page_config(layout="wide")
 
-st.title("🌱 ECORESTORE AI",frontsize=20)
+st.markdown("""
+<style>
+.big-font {
+    font-size:300px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown('<p class="big-font">🌱 ECORESTORE AI</p>', unsafe_allow_html=True)
 st.write("เครื่องมือประมวลผลดัชนีพืชพรรณและภูมิประเทศผ่านการระบุพิกัด BBox หรืออัปโหลดไฟล์ GeoJSON")
 
 # ==========================================
