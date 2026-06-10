@@ -44,7 +44,6 @@ if 'current_roi_dict' not in st.session_state:
 if input_mode == "กรอกพิกัด BBox Array":
     st.sidebar.write("รูปแบบพิกัด: `[Min Lon, Min Lat, Max Lon, Max Lat]`")
     
-    # สร้างคอลัมน์เพื่อให้กรอกพิกัดได้เป็นสัดส่วน
     col1, col2 = st.sidebar.columns(2)
     with col1:
         min_lon = st.number_input("West (Min Lon)", value=100.1000, format="%.4f")
@@ -55,7 +54,6 @@ if input_mode == "กรอกพิกัด BBox Array":
         
     if st.sidebar.button("📍 ยืนยันพิกัด BBox"):
         if min_lon < max_lon and min_lat < max_lat:
-            # สร้าง Rectangle Geometry จากค่าที่กรอก
             bbox_ee = ee.Geometry.Rectangle([min_lon, min_lat, max_lon, max_lat])
             st.session_state['current_roi_dict'] = bbox_ee.getInfo()
             st.sidebar.success("บันทึกขอบเขตพิกัด BBox เรียบร้อย!")
@@ -68,7 +66,6 @@ else:
         try:
             geojson_data = json.load(uploaded_file)
             
-            # ตรวจสอบโครงสร้างและดึงก้อน Geometry ออกมาให้เข้าฟอร์แมตของ GEE
             if geojson_data['type'] == 'FeatureCollection':
                 if len(geojson_data['features']) > 0:
                     geom = geojson_data['features'][0]['geometry']
@@ -84,7 +81,6 @@ else:
         except Exception as e:
             st.sidebar.error(f"การอ่านไฟล์ล้มเหลว: {e}")
 
-# ตั้งค่าพารามิเตอร์วันเวลาและคลาวด์เพิ่มเติม
 st.sidebar.header("📅 2. ช่วงเวลากรองภาพถ่าย")
 start_date = st.sidebar.date_input("วันที่เริ่มต้น", datetime.date(2023, 1, 1))
 end_date = st.sidebar.date_input("วันที่สิ้นสุด", datetime.date(2024, 1, 1))
@@ -92,19 +88,15 @@ cloud_cover = st.sidebar.slider("เกณฑ์เมฆสูงสุด (%)"
 run_button = st.sidebar.button("🚀 เริ่มการประมวลผลพื้นที่", use_container_width=True)
 
 # ==========================================
-# PREVIEW MAP (แสดงพื้นที่นำเข้าเพื่อความแน่ใจ)
+# PREVIEW MAP
 # ==========================================
 st.subheader("📍 ตรวจสอบขอบเขตพื้นที่นำเข้า")
 if st.session_state['current_roi_dict'] is not None:
     try:
-        # แปลงข้อมูลใน Session State กลับมาเป็น GEE Object เพื่อหาจุดกึ่งกลางแผนที่
         roi_geo = ee.Geometry(st.session_state['current_roi_dict'])
         center = roi_geo.centroid().coordinates().getInfo()
         
-        # วาดพื้นที่จำลองลงบนแผนที่ Folium แบบอ่านค่าอย่างเดียว (Read-only Preview)
         preview_map = folium.Map(location=[center[1], center[0]], zoom_start=12)
-        
-        # เพิ่มขอบเขตพื้นที่ที่ระบุลงบนแผนที่พื้นหลัง
         folium.GeoJson(
             st.session_state['current_roi_dict'],
             name="Selected AOI",
@@ -126,10 +118,8 @@ if run_button and st.session_state['current_roi_dict'] is not None:
 
     with st.spinner("⏳ กำลังดึงภาพถ่ายดาวเทียมและคำนวณแบบจำลองเชิงพื้นที่..."):
         try:
-            # ดึงขอบเขตที่เลือกมาประมวลผลร่วมกับ GEE
             roi = ee.Geometry(st.session_state['current_roi_dict'])
 
-            # ดึงข้อมูล DEM และ Sentinel-2 จากคลังเซิร์ฟเวอร์
             dem = ee.Image('USGS/SRTMGL1_003').clip(roi)
             s2_col = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED') \
                 .filterBounds(roi) \
@@ -138,11 +128,9 @@ if run_button and st.session_state['current_roi_dict'] is not None:
             
             s2 = s2_col.median().clip(roi)
 
-            # ตรวจสอบว่ามีข้อมูลภาพถ่ายดาวเทียมส่งกลับมาหรือไม่
             if s2.bandNames().size().getInfo() == 0:
                 st.error("❌ ไม่พบภาพดาวเทียมที่สอดคล้องตามเงื่อนไขเวลาและเปอร์เซ็นต์เมฆในพื้นที่นี้")
             else:
-                # คำนวณดัชนีเชิงวิเคราะห์ตามสูตรหลัก
                 ndvi = s2.normalizedDifference(['B8', 'B4']).rename('NDVI')
                 ndmi = s2.normalizedDifference(['B8', 'B11']).rename('NDMI')
                 bsi = s2.expression('((B11 + B4) - (B8 + B2)) / ((B11 + B4) + (B8 + B2))',
@@ -151,13 +139,11 @@ if run_button and st.session_state['current_roi_dict'] is not None:
                 slope = ee.Terrain.slope(dem)
                 elev = dem.select('elevation')
 
-                # วิเคราะห์หาพิกัดเขาหัวโล้น/ป่าเสื่อมโทรมขั้นรุนแรง
                 mountain = elev.gt(400).And(slope.gt(5)).rename('Mountain')
                 deforested = ndvi.lt(0.5).And(mountain)
                 intact_forest = ndvi.gt(0.65)
                 distance_to_forest = intact_forest.distance(ee.Kernel.euclidean(2000, 'meters'))
 
-                # ประเมินโครงสร้างพื้นที่ที่เหมาะสมต่อการฟื้นฟู (Suitability Analysis)
                 ready_high = bsi.lt(0.2).And(ndmi.gt(-0.1)).And(distance_to_forest.lt(500)).And(deforested)
                 ready_low = bsi.gt(0.3).Or(ndmi.lt(-0.2)).Or(distance_to_forest.gte(1000)).And(deforested)
                 ready_med = deforested.And(ready_high.Not()).And(ready_low.Not())
@@ -165,21 +151,16 @@ if run_button and st.session_state['current_roi_dict'] is not None:
                 suitability_map = ee.Image(0).clip(roi)
                 suitability_map = suitability_map.where(ready_low, 1).where(ready_med, 2).where(ready_high, 3)
 
-                # สรุปคะแนนการจัดการพื้นที่แบบจำแนกจุดย่อย (Micro-Targeting Scoring)
                 score_ndvi = ee.Image(0.5).subtract(ndvi).divide(0.4).multiply(100).clamp(0, 100)
                 score_slope = ee.Image(35).subtract(slope).divide(35).multiply(100).clamp(0, 100)
                 score_dist = ee.Image(500).subtract(distance_to_forest).divide(500).multiply(100).clamp(0, 100)
                 final_score = score_ndvi.multiply(0.4).add(score_slope.multiply(0.3)).add(score_dist.multiply(0.3)).round()
                 score_map = final_score.updateMask(deforested).unmask(-1)
 
-                # รวบรวมข้อมูลเพื่อแปลงเป็นภาพโครงข่ายพิกเซล
                 export_img = s2.select(['B4', 'B3', 'B2']).addBands([ndvi, suitability_map.rename('Suitability'), score_map.rename('Score'), elev, mountain])
-                
-                # โหลดภาพอาเรย์พิกเซลขนาดความละเอียดมาตราส่วน 20 เมตร
                 img_array = geemap.ee_to_numpy(export_img, region=roi, scale=20)
 
                 if img_array is not None:
-                    # แยกอาร์เรย์เป็นเลเยอร์ย่อยสำหรับพล็อตกราฟ Matplotlib
                     rgb_data = np.clip(img_array[:, :, 0:3].astype(float) / 2500.0, 0, 1)
                     ndvi_data = img_array[:, :, 3].astype(float)
                     suit_data = img_array[:, :, 4].astype(float)
@@ -187,13 +168,20 @@ if run_button and st.session_state['current_roi_dict'] is not None:
                     
                     score_data = img_array[:, :, 5].astype(float)
                     score_data[score_data == -1] = np.nan
+                    
+                    # ดึงข้อมูลระดับความสูงเชิงเลขและ Mask พื้นที่ภูเขามาเก็บในตัวแปรพล็อต
+                    elev_data = img_array[:, :, 6].astype(float)
+                    mountain_data = img_array[:, :, 7].astype(float)
+                    mountain_mask = np.where(mountain_data == 1, 1.0, np.nan)
 
-                    # แสดงผลแท็บข้อมูลจำแนกตามส่วนเนื้อหาการวิเคราะห์
                     st.subheader("📊 ผลลัพธ์การประมวลผลเชิงพื้นที่ รายงานแยกตามเลเยอร์")
                     t1, t2, t3 = st.tabs(["🖼️ NDVI & Terrain", "🎯 ความเหมาะสมในการฟื้นฟู", "📈 คะแนนลำดับความสำคัญ"])
 
+                    # ---------------------------------------------------------
+                    # แก้ไข: เพิ่มข้อมูล Elevation เข้ามาแสดงในแท็บที่ 1 (ใช้ระบบ 3 คอลัมน์)
+                    # ---------------------------------------------------------
                     with t1:
-                        col1, col2 = st.columns(2)
+                        col1, col2, col3 = st.columns(3)  # ปรับเพิ่มจาก 2 เป็น 3 คอลัมน์
                         with col1:
                             st.caption("ภาพถ่ายสีจริง True Color (Sentinel-2 Composite)")
                             fig_rgb, ax_rgb = plt.subplots()
@@ -204,9 +192,25 @@ if run_button and st.session_state['current_roi_dict'] is not None:
                             st.caption("ดัชนีความเขียวพืชพรรณ (NDVI Verification)")
                             fig_ndvi, ax_ndvi = plt.subplots()
                             im = ax_ndvi.imshow(ndvi_data, cmap='RdYlBu', vmin=0, vmax=0.8)
-                            plt.colorbar(im, ax=ax_ndvi)
+                            plt.colorbar(im, ax=ax_ndvi, orientation='horizontal', pad=0.05)
                             ax_ndvi.axis('off')
                             st.pyplot(fig_ndvi)
+                        with col3:
+                            st.caption("แบบจำลองความสูงเชิงเลข (SRTM DEM Elevation)")
+                            fig_elev, ax_elev = plt.subplots()
+                            # พล็อตแผนที่ระดับความสูง (DEM) ด้วยคัลเลอร์แมปภูมิประเทศ 'terrain'
+                            im_elev = ax_elev.imshow(elev_data, cmap='terrain')
+                            
+                            # เสริมเลเยอร์ไฮไลท์สีม่วงโปร่งแสงสำหรับเขตที่ระบบจำแนกเป็น "พื้นที่ภูเขา" (Mountain Area)
+                            ax_elev.imshow(mountain_mask, cmap='Purples', alpha=0.4, vmin=0, vmax=1.5)
+                            
+                            plt.colorbar(im_elev, ax=ax_elev, orientation='horizontal', pad=0.05, label='Meters ASL')
+                            ax_elev.axis('off')
+                            
+                            # เพิ่มสัญลักษณ์อธิบายแผนที่ (Legend) ของพิกัดภูเขา
+                            mountain_patch = mpatches.Patch(color='#8c96c6', label='Mountain Mask\n(Elev > 400m & Slope > 5°)')
+                            ax_elev.legend(handles=[mountain_patch], loc='lower right', fontsize=8)
+                            st.pyplot(fig_elev)
 
                     with t2:
                         st.caption("แผนที่จำแนกความเหมาะสมในการฟื้นฟูสภาพป่าไม้ (Restoration Suitability Map)")
